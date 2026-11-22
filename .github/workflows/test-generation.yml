@@ -3,6 +3,8 @@ name: Mystery Unlocked - Test Generation
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "30 4 * * *"
 
 permissions:
   contents: read
