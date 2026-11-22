@@ -1,18 +1,18 @@
 
 import os
 import json
+import base64
 from pathlib import Path
 from google import genai
-from google.genai import types
-
-# Mystery Unlocked - Main Program
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
-
 if not API_KEY:
     raise RuntimeError("GEMINI_API_KEY is missing")
 
-client = genai.Client(api_key=API_KEY)
+client = genai.Client(
+    api_key=API_KEY,
+    http_options={"api_version": "v1beta"}
+)
 
 OUTPUT = Path("output")
 OUTPUT.mkdir(exist_ok=True)
@@ -23,29 +23,27 @@ def generate_script():
     print("Generating documentary script...")
 
     prompt = f"""
-    Create an engaging English documentary for the YouTube
-    channel Mystery Unlocked.
+Create an engaging English documentary for Mystery Unlocked.
 
-    Topic: {TOPIC}
+Topic: {TOPIC}
 
-    Requirements:
-    - Approximately 5 minutes of narration.
-    - Interesting opening hook.
-    - Scientifically responsible explanations.
-    - No invented facts or fake quotations.
-    - Easy-to-understand English.
-    - Strong ending.
+Requirements:
+- Approximately 5 minutes of narration.
+- Strong opening hook.
+- Scientifically responsible explanations.
+- No invented facts or quotations.
+- Easy-to-understand English.
+- Engaging conclusion.
 
-    Return valid JSON with these fields:
-    title, description, tags, narration.
-    """
+Return JSON with title, description, tags and narration.
+"""
 
     response = client.models.generate_content(
         model="gemini-3.8-flash",
         contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json"
-        )
+        config={
+            "response_mime_type": "application/json"
+        }
     )
 
     data = json.loads(response.text)
@@ -58,35 +56,36 @@ def generate_script():
 
 
 def generate_voice(narration):
-    print("Generating male documentary narration...")
+    print("Generating documentary voice...")
 
-    response = client.models.generate_content(
+    interaction = client.interactions.create(
         model="gemini-3.8-flash-tts",
-        contents=narration,
-        config=types.GenerateContentConfig(
-            response_modalities=["AUDIO"],
-            speech_config=types.SpeechConfig(
-                voice_config=types.VoiceConfig(
-                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                        voice_name="Charon"
-                    )
-                )
-            )
-        )
+        input=[{
+            "type": "user_input",
+            "content": [{
+                "type": "text",
+                "text": narration,
+                "annotations": [{
+                    "type": "speech_metadata",
+                    "style": "Deep, calm, engaging male documentary narration"
+                }]
+            }]
+        }],
+        response_format={"type": "audio"},
+        generation_config={
+            "speech_config": [
+                {"voice": "Charon"}
+            ]
+        }
     )
 
-    audio_parts = [
-        part.inline_data.data
-        for part in response.parts
-        if part.inline_data
-    ]
+    audio = interaction.output_audio
 
-    if not audio_parts:
-        raise RuntimeError("Voice generation returned no audio.")
+    if not audio or not audio.data:
+        raise RuntimeError("No audio was generated")
 
     with open(OUTPUT / "narration.wav", "wb") as f:
-        for audio in audio_parts:
-            f.write(audio)
+        f.write(base64.b64decode(audio.data))
 
     print("Narration generated successfully.")
 
@@ -95,8 +94,7 @@ def main():
     data = generate_script()
     generate_voice(data["narration"])
 
-    print("Mystery Unlocked content generation completed.")
-    print("Files saved in the output folder.")
+    print("Content generation completed successfully.")
 
 
 if __name__ == "__main__":
