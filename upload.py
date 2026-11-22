@@ -2,6 +2,7 @@
 import os
 import json
 from pathlib import Path
+
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -10,8 +11,9 @@ OUTPUT = Path("output")
 VIDEO_FILE = OUTPUT / "mystery-unlocked.mp4"
 SCRIPT_FILE = OUTPUT / "script.json"
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
-
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload"
+]
 
 def upload_video():
     print("Preparing YouTube upload...")
@@ -37,16 +39,31 @@ def upload_video():
         credentials=credentials
     )
 
+    language = data.get("language", "english").lower()
+
+    title = data["title"][:100]
+
+    description = (
+        data["description"]
+        + "\n\n"
+        + "Mystery Unlocked | "
+        + language.upper()
+        + "\n"
+        + "Subscribe for more stories, mysteries and discoveries."
+    )
+
     body = {
         "snippet": {
-            "title": data["title"][:100],
-            "description": data["description"],
+            "title": title,
+            "description": description,
             "tags": data.get("tags", []),
-            "categoryId": "28"
+            "categoryId": "24"
         },
         "status": {
             "privacyStatus": "public",
-            "selfDeclaredMadeForKids": False
+            "selfDeclaredMadeForKids": bool(
+                data.get("made_for_kids", False)
+            )
         }
     }
 
@@ -65,12 +82,12 @@ def upload_video():
     response = request.execute()
 
     print("Upload completed successfully!")
+    print("Language:", language)
     print("YouTube video ID:", response["id"])
     print(
         "Video link:",
         "https://www.youtube.com/watch?v=" + response["id"]
     )
-
 
 if __name__ == "__main__":
     upload_video()
