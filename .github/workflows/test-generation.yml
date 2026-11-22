@@ -41,9 +41,12 @@ jobs:
         run: |
           python video.py
 
-      - name: Save generated files
+      - name: Save final video files
         uses: actions/upload-artifact@v4
         with:
-          name: mystery-unlocked-video-test
-          path: output/
+          name: mystery-unlocked-final-video
+          path: |
+            output/mystery-unlocked.mp4
+            output/narration.wav
+            output/script.json
           if-no-files-found: error
