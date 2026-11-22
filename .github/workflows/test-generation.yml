@@ -20,6 +20,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
@@ -30,9 +35,15 @@ jobs:
         run: |
           python main.py
 
+      - name: Create video
+        env:
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          python video.py
+
       - name: Save generated files
         uses: actions/upload-artifact@v4
         with:
-          name: mystery-unlocked-test
+          name: mystery-unlocked-video-test
           path: output/
           if-no-files-found: error
