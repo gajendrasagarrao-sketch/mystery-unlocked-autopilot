@@ -1,10 +1,21 @@
 
-name: Mystery Unlocked - Test Generation
+name: Mystery Unlocked - Daily Automation
 
 on:
   workflow_dispatch:
+    inputs:
+      language:
+        description: "Video language"
+        required: true
+        type: choice
+        options:
+          - English
+          - Hindi
+        default: English
+
   schedule:
     - cron: "30 4 * * *"
+    - cron: "30 12 * * *"
 
 permissions:
   contents: read
@@ -12,6 +23,10 @@ permissions:
 jobs:
   generate:
     runs-on: ubuntu-latest
+
+    env:
+      VIDEO_LANGUAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.language || (github.event.schedule == '30 12 * * *' && 'Hindi' || 'English') }}
+      YOUTUBE_PRIVACY: public
 
     steps:
       - name: Checkout repository
@@ -51,10 +66,10 @@ jobs:
         run: |
           python upload.py
 
-      - name: Save final video files
+      - name: Save generated files
         uses: actions/upload-artifact@v4
         with:
-          name: mystery-unlocked-final-video
+          name: mystery-unlocked-${{ env.VIDEO_LANGUAGE }}
           path: |
             output/mystery-unlocked.mp4
             output/narration.wav
