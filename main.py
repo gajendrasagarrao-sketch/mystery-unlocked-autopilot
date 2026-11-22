@@ -20,7 +20,18 @@ client = genai.Client(
 OUTPUT = Path("output")
 OUTPUT.mkdir(exist_ok=True)
 
-TOPIC = "What happens if you fall into a black hole?"
+CATEGORIES = [
+    "Mysteries and unexplained events",
+    "Science and amazing facts",
+    "Fiction and fantasy stories",
+    "Horror stories",
+    "Children's bedtime and moral stories",
+    "Devotional and Indian mythology stories"
+]
+
+TODAY_CATEGORY = CATEGORIES[date.today().toordinal() % len(CATEGORIES)]
+
+TOPIC = f"Create an engaging original video about: {TODAY_CATEGORY}. Choose a fresh and interesting topic within this category."
 
 def generate_script():
     print("Generating documentary script...")
