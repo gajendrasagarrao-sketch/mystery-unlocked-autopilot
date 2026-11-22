@@ -39,7 +39,7 @@ Return JSON with title, description, tags and narration.
 """
 
     response = client.models.generate_content(
-        model="gemini-3.8-flash",
+        model="gemini-2.5-flash",
         contents=prompt,
         config={
             "response_mime_type": "application/json"
