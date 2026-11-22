@@ -44,13 +44,19 @@ response = None
 
 for attempt in range(5):
     try:
-        response = client.models.generate_content(
-            model="gemini-3.1-flash-lite",
-            contents=prompt,
-            config={
-                "response_mime_type": "application/json"
-            }
-        )
+response_text = ""
+
+for chunk in client.models.generate_content_stream(
+    model="gemini-3.1-flash-lite",
+    contents=prompt,
+    config={
+        "response_mime_type": "application/json"
+    }
+):
+    if chunk.text:
+        response_text += chunk.text
+
+data = json.loads(response_text)
         break
 
     except Exception as e:
