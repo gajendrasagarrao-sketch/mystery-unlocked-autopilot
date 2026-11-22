@@ -38,12 +38,30 @@ Requirements:
 Return JSON with title, description, tags and narration.
 """
 
-    response = client.models.generate_content(
-        model="gemini-3.5-flash-lite",
-        contents=prompt,
-        config={
-            "response_mime_type": "application/json"
-        }
+    import time
+
+response = None
+
+for attempt in range(5):
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.5-flash-lite",
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json"
+            }
+        )
+        break
+
+    except Exception as e:
+        print(f"Attempt {attempt + 1} failed: {e}")
+
+        if attempt == 4:
+            raise
+
+        wait_time = 15 * (attempt + 1)
+        print(f"Retrying in {wait_time} seconds...")
+        time.sleep(wait_time)
     )
 
     data = json.loads(response.text)
