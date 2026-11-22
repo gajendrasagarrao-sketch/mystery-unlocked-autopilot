@@ -2,10 +2,12 @@
 import os
 import json
 import base64
+import time
 from pathlib import Path
 from google import genai
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
+
 if not API_KEY:
     raise RuntimeError("GEMINI_API_KEY is missing")
 
@@ -35,48 +37,63 @@ Requirements:
 - Easy-to-understand English.
 - Engaging conclusion.
 
-Return JSON with title, description, tags and narration.
+Return JSON with these fields:
+title, description, tags and narration.
 """
 
-    import time
+    response_text = ""
 
-response = None
+    for attempt in range(5):
+        try:
+            print(f"Gemini attempt {attempt + 1} of 5...")
 
-for attempt in range(5):
-    try:
-response_text = ""
+            response_text = ""
 
-for chunk in client.models.generate_content_stream(
-    model="gemini-3.1-flash-lite",
-    contents=prompt,
-    config={
-        "response_mime_type": "application/json"
-    }
-):
-    if chunk.text:
-        response_text += chunk.text
+            for chunk in client.models.generate_content_stream(
+                model="gemini-3.1-flash-lite",
+                contents=prompt,
+                config={
+                    "response_mime_type": "application/json"
+                }
+            ):
+                if chunk.text:
+                    response_text += chunk.text
 
-data = json.loads(response_text)
-        break
+            if not response_text.strip():
+                raise RuntimeError("Gemini returned an empty response")
 
-    except Exception as e:
-        print(f"Attempt {attempt + 1} failed: {e}")
+            data = json.loads(response_text)
 
-        if attempt == 4:
-            raise
+            required_fields = [
+                "title",
+                "description",
+                "tags",
+                "narration"
+            ]
 
-        wait_time = 15 * (attempt + 1)
-        print(f"Retrying in {wait_time} seconds...")
-        time.sleep(wait_time)
-    )
+            for field in required_fields:
+                if field not in data:
+                    raise ValueError(f"Missing JSON field: {field}")
 
-    data = json.loads(response.text)
+            with open(
+                OUTPUT / "script.json",
+                "w",
+                encoding="utf-8"
+            ) as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
 
-    with open(OUTPUT / "script.json", "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+            print("Script generated successfully.")
+            return data
 
-    print("Script generated successfully.")
-    return data
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed: {e}")
+
+            if attempt == 4:
+                raise
+
+            wait_time = 15 * (attempt + 1)
+            print(f"Retrying in {wait_time} seconds...")
+            time.sleep(wait_time)
 
 
 def generate_voice(narration):
