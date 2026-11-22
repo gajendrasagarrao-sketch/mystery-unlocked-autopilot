@@ -8,9 +8,13 @@ from pathlib import Path
 from google import genai
 
 API_KEY = os.environ.get("GEMINI_API_KEY")
+LANGUAGE = os.environ.get("VIDEO_LANGUAGE", "English").strip().lower()
 
 if not API_KEY:
     raise RuntimeError("GEMINI_API_KEY is missing")
+
+if LANGUAGE not in ("english", "hindi"):
+    raise RuntimeError("VIDEO_LANGUAGE must be English or Hindi")
 
 client = genai.Client(
     api_key=API_KEY,
@@ -29,31 +33,56 @@ CATEGORIES = [
     "Devotional and Indian mythology stories"
 ]
 
-TODAY_CATEGORY = CATEGORIES[date.today().toordinal() % len(CATEGORIES)]
-
-TOPIC = f"Create an engaging original video about: {TODAY_CATEGORY}. Choose a fresh and interesting topic within this category."
+TODAY_CATEGORY = CATEGORIES[
+    date.today().toordinal() % len(CATEGORIES)
+]
 
 def generate_script():
-    print("Generating documentary script...")
+    print(f"Generating {LANGUAGE} documentary...")
+    print(f"Category: {TODAY_CATEGORY}")
+
+    if LANGUAGE == "hindi":
+        language_instruction = """
+Write the entire narration in natural, fluent Hindi
+using Devanagari script.
+Use simple Indian Hindi suitable for listening.
+Keep the title and description in Hindi.
+"""
+    else:
+        language_instruction = """
+Write the entire narration in clear, natural English.
+Keep the title and description in English.
+"""
 
     prompt = f"""
-Create an engaging English documentary for Mystery Unlocked.
+You are the documentary storyteller for Mystery Unlocked.
 
-Topic: {TOPIC}
+Create an original video in the category:
+{TODAY_CATEGORY}
+
+Choose a fresh and interesting topic within this category.
+
+{language_instruction}
 
 Requirements:
 - Approximately 5 minutes of narration.
 - Strong opening hook.
-- Scientifically responsible explanations.
-- No invented facts or quotations.
-- Easy-to-understand English.
-- Engaging conclusion.
+- Engaging storytelling.
+- No invented facts presented as real.
+- Science must be scientifically responsible.
+- Fiction must be clearly fictional.
+- Horror must avoid graphic violence.
+- Children's stories must be gentle, safe and age-appropriate.
+- Devotional stories must be respectful.
+- Do not invent religious quotations or claim uncertain traditions are facts.
 
-Return JSON with these fields:
-title, description, tags and narration.
+Return valid JSON with exactly these fields:
+title, description, tags, narration, category, made_for_kids.
+
+Set made_for_kids to true only for children's bedtime
+and moral stories. Otherwise set it to false.
+Set tags as a JSON array of strings.
 """
-
-    response_text = ""
 
     for attempt in range(5):
         try:
@@ -71,45 +100,48 @@ title, description, tags and narration.
                 if chunk.text:
                     response_text += chunk.text
 
-            if not response_text.strip():
-                raise RuntimeError("Gemini returned an empty response")
-
             data = json.loads(response_text)
 
-            required_fields = [
+            required = [
                 "title",
                 "description",
                 "tags",
-                "narration"
+                "narration",
+                "category",
+                "made_for_kids"
             ]
 
-            for field in required_fields:
+            for field in required:
                 if field not in data:
-                    raise ValueError(f"Missing JSON field: {field}")
+                    raise ValueError(f"Missing field: {field}")
+
+            data["language"] = LANGUAGE
 
             with open(
                 OUTPUT / "script.json",
                 "w",
                 encoding="utf-8"
-            ) as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+            ) as file:
+                json.dump(
+                    data,
+                    file,
+                    indent=2,
+                    ensure_ascii=False
+                )
 
             print("Script generated successfully.")
             return data
 
-        except Exception as e:
-            print(f"Attempt {attempt + 1} failed: {e}")
+        except Exception as error:
+            print(f"Attempt {attempt + 1} failed: {error}")
 
             if attempt == 4:
                 raise
 
-            wait_time = 15 * (attempt + 1)
-            print(f"Retrying in {wait_time} seconds...")
-            time.sleep(wait_time)
-
+            time.sleep(15 * (attempt + 1))
 
 def generate_voice(narration):
-    print("Generating documentary voice...")
+    print(f"Generating {LANGUAGE} narration...")
 
     interaction = client.interactions.create(
         model="gemini-3.8-flash-tts",
@@ -120,7 +152,9 @@ def generate_voice(narration):
                 "text": narration,
                 "annotations": [{
                     "type": "speech_metadata",
-                    "style": "Deep, calm, engaging male documentary narration"
+                    "style": (
+                        "Deep, calm, engaging male documentary narration"
+                    )
                 }]
             }]
         }],
@@ -137,18 +171,15 @@ def generate_voice(narration):
     if not audio or not audio.data:
         raise RuntimeError("No audio was generated")
 
-    with open(OUTPUT / "narration.wav", "wb") as f:
-        f.write(base64.b64decode(audio.data))
+    with open(OUTPUT / "narration.wav", "wb") as file:
+        file.write(base64.b64decode(audio.data))
 
     print("Narration generated successfully.")
-
 
 def main():
     data = generate_script()
     generate_voice(data["narration"])
-
     print("Content generation completed successfully.")
-
 
 if __name__ == "__main__":
     main()
