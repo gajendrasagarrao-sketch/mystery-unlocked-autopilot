@@ -52,7 +52,6 @@ Write approximately 600 to 750 Hindi words.
 """
         minimum_words = 600
         maximum_words = 750
-
     else:
         language_instruction = """
 Write the entire narration in clear, natural English.
@@ -102,7 +101,7 @@ Set tags as a JSON array of strings.
             response_text = ""
 
             for chunk in client.models.generate_content_stream(
-                model="gemini-3.1-flash-lite",
+                model="gemini-3.5-flash-lite",
                 contents=prompt,
                 config={
                     "response_mime_type": "application/json"
@@ -132,7 +131,6 @@ Set tags as a JSON array of strings.
                 raise ValueError("Narration is empty or invalid")
 
             word_count = len(narration.split())
-
             print(f"Narration word count: {word_count}")
 
             if not minimum_words <= word_count <= maximum_words:
@@ -170,14 +168,16 @@ Set tags as a JSON array of strings.
                     "Could not generate a valid script after 5 attempts"
                 ) from error
 
-            time.sleep(15 * (attempt + 1))
+            wait_seconds = [30, 60, 120, 180][attempt]
+            print(f"Waiting {wait_seconds} seconds before retry...")
+            time.sleep(wait_seconds)
 
 
 def generate_voice(narration):
     print(f"Generating {LANGUAGE} narration...")
 
     interaction = client.interactions.create(
-        model="gemini-3.5-flash-lite",
+        model="gemini-3.8-flash-tts",
         input=[{
             "type": "user_input",
             "content": [{
