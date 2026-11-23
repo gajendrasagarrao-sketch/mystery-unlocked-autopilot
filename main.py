@@ -65,7 +65,9 @@ Choose a fresh and interesting topic within this category.
 {language_instruction}
 
 Requirements:
-- Approximately 5 minutes of narration.
+- Write between 650 and 850 words for English narration.
+- Write between 600 and 750 words for Hindi narration.
+- Aim for approximately 5 to 6 minutes of spoken narration.
 - Strong opening hook.
 - Engaging storytelling.
 - No invented facts presented as real.
