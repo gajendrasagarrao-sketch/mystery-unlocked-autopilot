@@ -37,6 +37,7 @@ TODAY_CATEGORY = CATEGORIES[
     date.today().toordinal() % len(CATEGORIES)
 ]
 
+
 def generate_script():
     print(f"Generating {LANGUAGE} documentary...")
     print(f"Category: {TODAY_CATEGORY}")
@@ -47,12 +48,19 @@ Write the entire narration in natural, fluent Hindi
 using Devanagari script.
 Use simple Indian Hindi suitable for listening.
 Keep the title and description in Hindi.
+Write approximately 600 to 750 Hindi words.
 """
+        minimum_words = 600
+        maximum_words = 750
+
     else:
         language_instruction = """
 Write the entire narration in clear, natural English.
 Keep the title and description in English.
+Write approximately 650 to 850 English words.
 """
+        minimum_words = 650
+        maximum_words = 850
 
     prompt = f"""
 You are the documentary storyteller for Mystery Unlocked.
@@ -65,18 +73,19 @@ Choose a fresh and interesting topic within this category.
 {language_instruction}
 
 Requirements:
-- Write between 650 and 850 words for English narration.
-- Write between 600 and 750 words for Hindi narration.
-- Aim for approximately 5 to 6 minutes of spoken narration.
+- Aim for approximately 5 to 6 minutes of narration.
 - Strong opening hook.
-- Engaging storytelling.
+- Engaging storytelling from beginning to end.
+- Include a satisfying conclusion.
 - No invented facts presented as real.
 - Science must be scientifically responsible.
 - Fiction must be clearly fictional.
 - Horror must avoid graphic violence.
 - Children's stories must be gentle, safe and age-appropriate.
 - Devotional stories must be respectful.
-- Do not invent religious quotations or claim uncertain traditions are facts.
+- Do not invent religious quotations or claim uncertain traditions as facts.
+- Avoid unnecessary repetition.
+- Do not make the narration too short.
 
 Return valid JSON with exactly these fields:
 title, description, tags, narration, category, made_for_kids.
@@ -103,23 +112,6 @@ Set tags as a JSON array of strings.
                     response_text += chunk.text
 
             data = json.loads(response_text)
-            narration = data.get("narration", "")
-word_count = len(narration.split())
-
-if LANGUAGE == "hindi":
-    minimum_words = 600
-    maximum_words = 750
-else:
-    minimum_words = 650
-    maximum_words = 850
-
-print(f"Narration word count: {word_count}")
-
-if not minimum_words <= word_count <= maximum_words:
-    raise ValueError(
-        f"Narration is too short or too long: {word_count} words. "
-        f"Required: {minimum_words}-{maximum_words} words."
-    )
 
             required = [
                 "title",
@@ -134,7 +126,26 @@ if not minimum_words <= word_count <= maximum_words:
                 if field not in data:
                     raise ValueError(f"Missing field: {field}")
 
+            narration = data["narration"]
+
+            if not isinstance(narration, str) or not narration.strip():
+                raise ValueError("Narration is empty or invalid")
+
+            word_count = len(narration.split())
+
+            print(f"Narration word count: {word_count}")
+
+            if not minimum_words <= word_count <= maximum_words:
+                raise ValueError(
+                    f"Narration length invalid: {word_count} words. "
+                    f"Required: {minimum_words}-{maximum_words}."
+                )
+
+            if not isinstance(data["tags"], list):
+                raise ValueError("Tags must be a JSON array")
+
             data["language"] = LANGUAGE
+            data["category"] = TODAY_CATEGORY
 
             with open(
                 OUTPUT / "script.json",
@@ -155,9 +166,12 @@ if not minimum_words <= word_count <= maximum_words:
             print(f"Attempt {attempt + 1} failed: {error}")
 
             if attempt == 4:
-                raise
+                raise RuntimeError(
+                    "Could not generate a valid script after 5 attempts"
+                ) from error
 
             time.sleep(15 * (attempt + 1))
+
 
 def generate_voice(narration):
     print(f"Generating {LANGUAGE} narration...")
@@ -195,10 +209,12 @@ def generate_voice(narration):
 
     print("Narration generated successfully.")
 
+
 def main():
     data = generate_script()
     generate_voice(data["narration"])
     print("Content generation completed successfully.")
+
 
 if __name__ == "__main__":
     main()
