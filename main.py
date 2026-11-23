@@ -24,6 +24,12 @@ client = genai.Client(
 OUTPUT = Path("output")
 OUTPUT.mkdir(exist_ok=True)
 
+# Primary and backup script-generation models
+SCRIPT_MODELS = [
+    "gemini-3.5-flash-lite",
+    "gemini-3.8-flash"
+]
+
 CATEGORIES = [
     "Mysteries and unexplained events",
     "Science and amazing facts",
@@ -36,6 +42,66 @@ CATEGORIES = [
 TODAY_CATEGORY = CATEGORIES[
     date.today().toordinal() % len(CATEGORIES)
 ]
+
+
+def is_temporary_error(error):
+    message = str(error).upper()
+
+    return any(code in message for code in [
+        "503",
+        "UNAVAILABLE",
+        "500",
+        "502",
+        "504",
+        "INTERNAL SERVER ERROR"
+    ])
+
+
+def generate_script_text(prompt):
+    for model in SCRIPT_MODELS:
+        print(f"Trying script model: {model}")
+
+        for attempt in range(3):
+            try:
+                print(
+                    f"Attempt {attempt + 1} of 3 "
+                    f"using {model}..."
+                )
+
+                response = client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config={
+                        "response_mime_type": "application/json"
+                    }
+                )
+
+                if not response.text:
+                    raise ValueError("Gemini returned an empty response")
+
+                print(f"Script generated using {model}")
+                return response.text
+
+            except Exception as error:
+                print(f"Attempt failed: {error}")
+
+                if not is_temporary_error(error):
+                    raise
+
+                if attempt < 2:
+                    wait = [30, 60][attempt]
+                    print(f"Waiting {wait} seconds...")
+                    time.sleep(wait)
+                else:
+                    print(
+                        f"{model} unavailable. "
+                        "Switching to backup model..."
+                    )
+
+    raise RuntimeError(
+        "Both Gemini models failed. "
+        "Please try again later."
+    )
 
 
 def generate_script():
@@ -52,6 +118,7 @@ Write approximately 600 to 750 Hindi words.
 """
         minimum_words = 600
         maximum_words = 750
+
     else:
         language_instruction = """
 Write the entire narration in clear, natural English.
@@ -64,25 +131,24 @@ Write approximately 650 to 850 English words.
     prompt = f"""
 You are the documentary storyteller for Mystery Unlocked.
 
-Create an original video in the category:
+Create an original video in this category:
 {TODAY_CATEGORY}
 
-Choose a fresh and interesting topic within this category.
+Choose a fresh and interesting topic.
 
 {language_instruction}
 
 Requirements:
 - Aim for approximately 5 to 6 minutes of narration.
-- Strong opening hook.
-- Engaging storytelling from beginning to end.
+- Start with a powerful opening hook.
+- Keep the storytelling engaging.
 - Include a satisfying conclusion.
-- No invented facts presented as real.
+- Do not present invented facts as real.
 - Science must be scientifically responsible.
 - Fiction must be clearly fictional.
 - Horror must avoid graphic violence.
-- Children's stories must be gentle, safe and age-appropriate.
+- Children's stories must be gentle and age-appropriate.
 - Devotional stories must be respectful.
-- Do not invent religious quotations or claim uncertain traditions as facts.
 - Avoid unnecessary repetition.
 - Do not make the narration too short.
 
@@ -91,86 +157,63 @@ title, description, tags, narration, category, made_for_kids.
 
 Set made_for_kids to true only for children's bedtime
 and moral stories. Otherwise set it to false.
+
 Set tags as a JSON array of strings.
 """
 
-    for attempt in range(5):
-        try:
-            print(f"Gemini attempt {attempt + 1} of 5...")
+    response_text = generate_script_text(prompt)
 
-            response_text = ""
+    data = json.loads(response_text)
 
-            for chunk in client.models.generate_content_stream(
-                model="gemini-3.5-flash-lite",
-                contents=prompt,
-                config={
-                    "response_mime_type": "application/json"
-                }
-            ):
-                if chunk.text:
-                    response_text += chunk.text
+    required = [
+        "title",
+        "description",
+        "tags",
+        "narration",
+        "category",
+        "made_for_kids"
+    ]
 
-            data = json.loads(response_text)
+    for field in required:
+        if field not in data:
+            raise ValueError(f"Missing field: {field}")
 
-            required = [
-                "title",
-                "description",
-                "tags",
-                "narration",
-                "category",
-                "made_for_kids"
-            ]
+    narration = data["narration"]
 
-            for field in required:
-                if field not in data:
-                    raise ValueError(f"Missing field: {field}")
+    if not isinstance(narration, str) or not narration.strip():
+        raise ValueError("Narration is empty or invalid")
 
-            narration = data["narration"]
+    word_count = len(narration.split())
 
-            if not isinstance(narration, str) or not narration.strip():
-                raise ValueError("Narration is empty or invalid")
+    print(f"Narration word count: {word_count}")
 
-            word_count = len(narration.split())
-            print(f"Narration word count: {word_count}")
+    if not minimum_words <= word_count <= maximum_words:
+        raise ValueError(
+            f"Expected {minimum_words}-{maximum_words} words, "
+            f"but received {word_count}."
+        )
 
-            if not minimum_words <= word_count <= maximum_words:
-                raise ValueError(
-                    f"Narration length invalid: {word_count} words. "
-                    f"Required: {minimum_words}-{maximum_words}."
-                )
+    if not isinstance(data["tags"], list):
+        raise ValueError("Tags must be a JSON array")
 
-            if not isinstance(data["tags"], list):
-                raise ValueError("Tags must be a JSON array")
+    data["language"] = LANGUAGE
+    data["category"] = TODAY_CATEGORY
 
-            data["language"] = LANGUAGE
-            data["category"] = TODAY_CATEGORY
+    with open(
+        OUTPUT / "script.json",
+        "w",
+        encoding="utf-8"
+    ) as file:
+        json.dump(
+            data,
+            file,
+            indent=2,
+            ensure_ascii=False
+        )
 
-            with open(
-                OUTPUT / "script.json",
-                "w",
-                encoding="utf-8"
-            ) as file:
-                json.dump(
-                    data,
-                    file,
-                    indent=2,
-                    ensure_ascii=False
-                )
+    print("Script generated successfully.")
 
-            print("Script generated successfully.")
-            return data
-
-        except Exception as error:
-            print(f"Attempt {attempt + 1} failed: {error}")
-
-            if attempt == 4:
-                raise RuntimeError(
-                    "Could not generate a valid script after 5 attempts"
-                ) from error
-
-            wait_seconds = [30, 60, 120, 180][attempt]
-            print(f"Waiting {wait_seconds} seconds before retry...")
-            time.sleep(wait_seconds)
+    return data
 
 
 def generate_voice(narration):
@@ -186,7 +229,8 @@ def generate_voice(narration):
                 "annotations": [{
                     "type": "speech_metadata",
                     "style": (
-                        "Deep, calm, engaging male documentary narration"
+                        "Deep, calm, engaging male "
+                        "documentary narration"
                     )
                 }]
             }]
@@ -213,6 +257,7 @@ def generate_voice(narration):
 def main():
     data = generate_script()
     generate_voice(data["narration"])
+
     print("Content generation completed successfully.")
 
 
