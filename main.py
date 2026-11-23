@@ -103,6 +103,23 @@ Set tags as a JSON array of strings.
                     response_text += chunk.text
 
             data = json.loads(response_text)
+            narration = data.get("narration", "")
+word_count = len(narration.split())
+
+if LANGUAGE == "hindi":
+    minimum_words = 600
+    maximum_words = 750
+else:
+    minimum_words = 650
+    maximum_words = 850
+
+print(f"Narration word count: {word_count}")
+
+if not minimum_words <= word_count <= maximum_words:
+    raise ValueError(
+        f"Narration is too short or too long: {word_count} words. "
+        f"Required: {minimum_words}-{maximum_words} words."
+    )
 
             required = [
                 "title",
