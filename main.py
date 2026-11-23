@@ -177,7 +177,7 @@ def generate_voice(narration):
     print(f"Generating {LANGUAGE} narration...")
 
     interaction = client.interactions.create(
-        model="gemini-3.8-flash-tts",
+        model="gemini-3.5-flash-lite",
         input=[{
             "type": "user_input",
             "content": [{
