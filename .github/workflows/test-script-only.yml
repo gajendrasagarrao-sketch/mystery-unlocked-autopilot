@@ -1,0 +1,50 @@
+
+name: Mystery Unlocked - Script Only Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      language:
+        description: Video language
+        required: true
+        type: choice
+        options:
+          - English
+          - Hindi
+        default: English
+
+permissions:
+  contents: read
+
+jobs:
+  test-script:
+    runs-on: ubuntu-latest
+
+    env:
+      VIDEO_LANGUAGE: ${{ inputs.language }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate script and narration
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python main.py
+
+      - name: Save test files
+        uses: actions/upload-artifact@v4
+        with:
+          name: script-test-${{ inputs.language }}
+          path: |
+            output/script.json
+            output/narration.wav
+          if-no-files-found: error
