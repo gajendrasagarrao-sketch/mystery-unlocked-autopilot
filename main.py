@@ -103,10 +103,10 @@ Set tags as a JSON array of strings.
 """
 
     for model in SCRIPT_MODELS:
-        for attempt in range(3):
+        for attempt in range(5):
             try:
                 print(
-                    f"Attempt {attempt + 1} of 3 "
+                    f"Attempt {attempt + 1} of 5 "
                     f"using {model}..."
                 )
 
@@ -183,15 +183,16 @@ Set tags as a JSON array of strings.
                     f"{error}"
                 )
 
-                if attempt < 2:
-                    wait_time = 30 * (attempt + 1)
+                if attempt < 4:
+                    wait_time = 30 * (2 ** attempt)
                     print(f"Waiting {wait_time} seconds...")
                     time.sleep(wait_time)
 
         print(f"{model} unavailable. Trying the next model...")
 
     raise RuntimeError(
-        "Both Gemini models failed. Please try again later."
+        "Both Gemini models failed after 5 attempts each. "
+        "Please try again later."
     )
 
 
