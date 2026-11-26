@@ -46,11 +46,69 @@ TODAY_CATEGORY = CATEGORIES[
 ]
 
 
+def get_category_instruction(category):
+
+    instructions = {
+        "Mysteries and unexplained events": """
+Create an engaging mystery documentary.
+Focus on unexplained events, strange discoveries,
+historical mysteries or unanswered questions.
+Separate confirmed facts from theories.
+Do not turn the video into a general science lesson.
+""",
+
+        "Science and amazing facts": """
+Create an accurate and fascinating science documentary.
+Explain real scientific discoveries, natural phenomena,
+space, technology, physics, biology or amazing facts.
+Do not invent scientific facts.
+""",
+
+        "Fiction and fantasy stories": """
+Create a completely original fictional story.
+Include interesting characters, a setting, a central conflict,
+unexpected developments and a satisfying ending.
+Fantasy elements are allowed.
+This MUST be a STORY, not a science documentary.
+Do not explain how scientific objects or machines work.
+""",
+
+        "Horror stories": """
+Create an original atmospheric horror story.
+Build suspense through characters, setting and events.
+Use mystery and psychological tension.
+Avoid graphic violence and excessive gore.
+This MUST be a horror story, not a science explanation.
+""",
+
+        "Children's bedtime and moral stories": """
+Create a gentle, original children's bedtime or moral story.
+Use simple language, friendly characters and a positive lesson.
+Keep the story safe, warm and age-appropriate.
+This MUST be a children's STORY.
+""",
+
+        "Devotional and Indian mythology stories": """
+Create a respectful devotional or Indian mythology story.
+Focus on meaningful characters, events, values and teachings.
+Respect religious traditions.
+Do not invent religious quotations or present uncertain
+traditions as verified historical facts.
+"""
+    }
+
+    return instructions[category]
+
+
 def generate_script():
+
     print(f"Generating {LANGUAGE} documentary...")
     print(f"Category: {TODAY_CATEGORY}")
 
+    category_instruction = get_category_instruction(TODAY_CATEGORY)
+
     if LANGUAGE == "hindi":
+
         language_instruction = """
 Write the entire narration in natural, fluent Hindi
 using Devanagari script.
@@ -58,28 +116,46 @@ Use simple Indian Hindi suitable for listening.
 Keep the title and description in Hindi.
 Write approximately 600 to 750 Hindi words.
 """
+
         minimum_words = 600
         maximum_words = 750
+
     else:
+
         language_instruction = """
 Write the entire narration in clear, natural English.
 Keep the title and description in English.
 Write approximately 650 to 850 English words.
 """
+
         minimum_words = 650
         maximum_words = 850
 
     prompt = f"""
-You are the documentary storyteller for Mystery Unlocked.
+You are the professional storyteller and documentary
+creator for the YouTube channel Mystery Unlocked.
 
-Create an original video in the category:
+TODAY'S SELECTED CATEGORY:
 {TODAY_CATEGORY}
 
-Choose a fresh and interesting topic within this category.
+MANDATORY CATEGORY INSTRUCTIONS:
+{category_instruction}
+
+IMPORTANT:
+- Follow today's selected category exactly.
+- Do not select a different category.
+- Do not turn fictional stories into science documentaries.
+- Do not turn science documentaries into fictional stories.
+- The title, description, tags and entire narration
+  must match today's selected category.
+- The narration must genuinely belong to the selected category.
+- Do not simply add the category name to unrelated content.
+- Return the exact selected category in the JSON category field:
+  {TODAY_CATEGORY}
 
 {language_instruction}
 
-Requirements:
+GENERAL REQUIREMENTS:
 - Aim for approximately 5 to 6 minutes of narration.
 - Start with a strong opening hook.
 - Keep the storytelling engaging from beginning to end.
@@ -90,7 +166,8 @@ Requirements:
 - Horror must avoid graphic violence.
 - Children's stories must be gentle, safe and age-appropriate.
 - Devotional stories must be respectful.
-- Do not invent religious quotations or claim uncertain traditions as facts.
+- Do not invent religious quotations or claim uncertain
+  traditions as facts.
 - Avoid unnecessary repetition.
 - Do not make the narration too short.
 
@@ -100,12 +177,18 @@ title, description, tags, narration, category, made_for_kids.
 Set made_for_kids to true only for children's bedtime
 and moral stories. Otherwise set it to false.
 
+Set category to exactly:
+{TODAY_CATEGORY}
+
 Set tags as a JSON array of strings.
 """
 
     for model in SCRIPT_MODELS:
+
         for attempt in range(5):
+
             try:
+
                 print(
                     f"Attempt {attempt + 1} of 5 "
                     f"using {model}..."
@@ -120,6 +203,7 @@ Set tags as a JSON array of strings.
                         "response_mime_type": "application/json"
                     }
                 ):
+
                     if chunk.text:
                         response_text += chunk.text
 
@@ -135,28 +219,52 @@ Set tags as a JSON array of strings.
                 ]
 
                 for field in required:
+
                     if field not in data:
+
                         raise ValueError(
                             f"Missing field: {field}"
                         )
 
+                if data["category"] != TODAY_CATEGORY:
+
+                    raise ValueError(
+                        "Generated category does not match "
+                        f"today's category: {TODAY_CATEGORY}"
+                    )
+
                 narration = data["narration"]
 
                 if not isinstance(narration, str) or not narration.strip():
-                    raise ValueError("Narration is empty or invalid")
+
+                    raise ValueError(
+                        "Narration is empty or invalid"
+                    )
 
                 word_count = len(narration.split())
 
-                print(f"Narration word count: {word_count}")
+                print(
+                    f"Narration word count: {word_count}"
+                )
 
                 if not minimum_words <= word_count <= maximum_words:
+
                     raise ValueError(
                         f"Narration length invalid: {word_count} words. "
                         f"Required: {minimum_words}-{maximum_words}."
                     )
 
                 if not isinstance(data["tags"], list):
-                    raise ValueError("Tags must be a JSON array")
+
+                    raise ValueError(
+                        "Tags must be a JSON array"
+                    )
+
+                if not isinstance(data["made_for_kids"], bool):
+
+                    raise ValueError(
+                        "made_for_kids must be true or false"
+                    )
 
                 data["language"] = LANGUAGE
                 data["category"] = TODAY_CATEGORY
@@ -166,6 +274,7 @@ Set tags as a JSON array of strings.
                     "w",
                     encoding="utf-8"
                 ) as file:
+
                     json.dump(
                         data,
                         file,
@@ -179,25 +288,32 @@ Set tags as a JSON array of strings.
                 return data
 
             except Exception as error:
+
                 print(
                     f"Attempt {attempt + 1} using {model} failed: "
                     f"{error}"
                 )
 
                 if attempt < 4:
+
                     wait_time = 30 * (2 ** attempt)
+
                     print(f"Waiting {wait_time} seconds...")
+
                     time.sleep(wait_time)
 
-        print(f"{model} unavailable. Trying the next model...")
+        print(
+            f"{model} unavailable. Trying the next model..."
+        )
 
     raise RuntimeError(
-        "Both Gemini models failed after 5 attempts each. "
-        "Please try again later."
+        f"All {len(SCRIPT_MODELS)} Gemini models failed "
+        "after 5 attempts each. Please try again later."
     )
 
 
 def generate_voice(narration):
+
     print(f"Generating {LANGUAGE} narration...")
 
     interaction = client.interactions.create(
@@ -226,19 +342,36 @@ def generate_voice(narration):
     audio = interaction.output_audio
 
     if not audio or not audio.data:
-        raise RuntimeError("No audio was generated")
 
-    with open(OUTPUT / "narration.wav", "wb") as file:
-        file.write(base64.b64decode(audio.data))
+        raise RuntimeError(
+            "No audio was generated"
+        )
+
+    with open(
+        OUTPUT / "narration.wav",
+        "wb"
+    ) as file:
+
+        file.write(
+            base64.b64decode(audio.data)
+        )
 
     print("Narration generated successfully.")
 
 
 def main():
+
     data = generate_script()
-    generate_voice(data["narration"])
-    print("Content generation completed successfully.")
+
+    generate_voice(
+        data["narration"]
+    )
+
+    print(
+        "Content generation completed successfully."
+    )
 
 
 if __name__ == "__main__":
+
     main()
